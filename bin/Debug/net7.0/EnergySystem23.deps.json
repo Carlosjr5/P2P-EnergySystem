@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v7.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v7.0": {
+      "EnergySystem23/1.0.0": {
+        "dependencies": {
+          "ActressMas": "3.0.0.0"
+        },
+        "runtime": {
+          "EnergySystem23.dll": {}
+        }
+      },
+      "ActressMas/3.0.0.0": {
+        "runtime": {
+          "ActressMas.dll": {
+            "assemblyVersion": "3.0.0.0",
+            "fileVersion": "3.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "EnergySystem23/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ActressMas/3.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
