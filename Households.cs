@@ -1,8 +1,11 @@
 ﻿using ActressMas;
-using System.ComponentModel.Design;
+using System.Diagnostics;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using static EnergySystem23.Program;
+using System.Threading;
+using System;
+using Google.Api.Ads.AdWords.v201809;
+using Microsoft.VisualBasic;
 
 
 namespace EnergySystem23
@@ -11,6 +14,9 @@ namespace EnergySystem23
     //Class running on top of the AcctressMas as an Agent using its environment.
     class Households : Agent
     {
+        private Dictionary<string, DateTime> buyerBids;
+
+
         //Amount of energy household neeeds.
         private int household_Needs;
         //Ammount of energy household generates.
@@ -43,16 +49,19 @@ namespace EnergySystem23
         //List with the households who became buyers.
         private List<string> listOfBuyers;
         //List to store the deals offered by buyers.
-        private Dictionary<string, int> deals;
+        public Dictionary<string, int> deals;
         //Counting the messages of deals recieved by the buyers and messages of sellers.
         private int countBuyerDeals = 0;
 
+       
 
+
+        private Timer timer;
 
 
         List<int> BuyerDealsList = new List<int>();
 
-
+        private decimal storedHighestWinRate;
         private int cuenta = 1;
         private int total = 0;
 
@@ -66,8 +75,7 @@ namespace EnergySystem23
             deals = new Dictionary<string, int>();
             //Set number of deals as number of households.
             HouseholdSetup.numberOfDeals++;
-
-           
+            buyerBids = new Dictionary<string, DateTime>();
 
         }
 
@@ -137,7 +145,7 @@ namespace EnergySystem23
                     {
                         //Printing how much energy does the household has for selling.
                         sellerDeals();
-                        
+
 
                     }
                     else
@@ -146,7 +154,7 @@ namespace EnergySystem23
                         Send("manager", "seller_decline");
                         HouseholdSetup.numberOfDeals++;
                     }
-                break;
+                    break;
 
 
                 //Printing the list of buyers in order to set a deal for each of them, once its requested by ManagerAgent class.
@@ -159,7 +167,7 @@ namespace EnergySystem23
                         //For each buyer add the buyer parameters into the list.
                         listOfBuyers.Add(buyer);
 
-                    
+
 
                     }
                     //Function to add the seller household name and set the list of buyers.
@@ -189,28 +197,28 @@ namespace EnergySystem23
 
 
 
-             
 
                     //Checks if the amount of energy the household needs to buy is more than 0.
                     if (household_Buys != 0)
                     {
 
-                      
+
 
                         //while it needs to buy more energy, will send a deal with an amount of 1 pounds less of what it pays to main source.
                         Send(message.Sender, $"buyerOffers {mainSourceBuyDeal - 1}");
                         HouseholdSetup.numberOfDeals++;
+                        string currentTime = DateTime.Now.ToString("HH:mm:ss");
                         //Saves the deals of the buyer(household) withing the amount able to pay and total energy left needed to buy.
                         string buyerDealsData = ($"\n" + "          |----------------------------------|\n" +
-                                              $"                --- Buyers Deals {HouseholdSetup.compradores++} ---  \n " +
-                                              $"\n          |-> {this.Name}                     |\n" +
-                                              $"          |-> Offers £{mainSourceBuyDeal - 1}/kWh             |\n" +
-                                              $"          |-> Total energy needed: {household_Buys}kWh. |\n" +
-                                              $"          |-----------------------------------|\n");
+                                              $"                --- Buyers Deals {HouseholdSetup.compradores++} ---  \n" +
+                                              $"          |-> {this.Name}, at '{currentTime}'   |\n" +
+                                              $"          |-> Offers £{mainSourceBuyDeal - 1}/kWh                 |\n" +
+                                              $"          |-> Total energy needed: {household_Buys}kWh.     |\n" +
+                                              $"          |----------------------------------|\n");
 
-               
-                    
-                      
+
+
+
                         //Prints data into system.
                         Console.WriteLine(buyerDealsData);
                         //Saving records into the txt document.
@@ -239,32 +247,32 @@ namespace EnergySystem23
                     //One more offer added to the system, 
                     countBuyerDeals++;
 
-                   
+
                     deals.Add(message.Sender, Int32.Parse(parameters[0]));
                     //While the number of deals and the number of buyers are the same, there will be deal open.
                     //so has to be validated with the method for ValidateDeal().
                     if (countBuyerDeals == listOfBuyers.Count)
                     {
 
-
-                     
-
-
-
                         //The transactions are validated using this function
                         //which checks for first and second higher prices in the market.
 
-                        if (HouseholdSetup.protocol == true) 
+                        if (HouseholdSetup.protocol == true)
                         {
-                            ValidateDeal();
+                            //Double Auction Validation.
+                            ValidateDoubleAuctionDeal();
                             break;
                         }
                         if (HouseholdSetup.protocol == false)
                         {
-                            ValidateDutchDeal();
+                            //Dutch Auction Validation.
+                            ValidateDeal();
                             break;
                         }
+
+
                     }
+                
                     break;
 
                 //Sellers receive this when a buyer submits a rejection
@@ -277,13 +285,15 @@ namespace EnergySystem23
                     {
                         if (HouseholdSetup.protocol == true)
                         {
-                            ValidateDeal();
+                            //Double Auction.
+                            ValidateDoubleAuctionDeal();
                             break;
                         }
 
                         if (HouseholdSetup.protocol == false)
                         {
-                            ValidateDutchDeal();
+                            //Second-Bid Auction
+                            ValidateDeal();
                             break;
                         }
                     }
@@ -319,13 +329,13 @@ namespace EnergySystem23
                 //Received when it's time to total up costs at end
                 case "BuyersSummarize":
                     BuyerSummarize();
-                
+
                     break;
 
                 //Received when it's time to total up costs at end
                 case "SellersSummarize":
                     SellerSummarize();
-                  
+
                     break;
 
                 case "fin":
@@ -343,7 +353,7 @@ namespace EnergySystem23
             //While there are deals left.
             if (deals.Count != 0)
             {
-              
+
 
                 //Getting the 1st highest value and the second in order to the first pay what the second offers.
                 var firstHighestValue = deals.OrderByDescending(x => x.Value).FirstOrDefault();
@@ -367,16 +377,16 @@ namespace EnergySystem23
                 seller_money_sold += FinalPay.Value;
                 household_Money += FinalPay.Value;
                 string dealCompleted = ($"      |----------------------------------------------------------------------|\n" +
-                                        $"       |     Deal Completed -> {firstHighestValue.Key} buys 1kWh for a total of £{FinalPay.Value}.  |\n" +
+                                        $"       |     Deal {HouseholdSetup.dealsCompleted++} Completed -> {firstHighestValue.Key} buys 1kWh for a total of £{FinalPay.Value}.  |\n" +
                                         $"      |----------------------------------------------------------------------|\n");
-    
+
                 Console.WriteLine(dealCompleted);
                 //Saving the data into the txt document.
                 saveSummarize(dealCompleted);
                 //Calls the manager to get the next deal by the seller.
                 Send("manager", "NextDeal");
                 HouseholdSetup.numberOfDeals++;
-           
+
 
                 NextDeal();
             }
@@ -384,120 +394,255 @@ namespace EnergySystem23
             //When there are no more deals, make summarize
             else
             {
-                Console.WriteLine("\n   |-----No remaining buyers-----| \n");
-
-                Console.WriteLine("\n       |--Market Finished--| \n");
-                //Broadcasting the case which has the data of the summarize and the movements between the peers and main source.
-                BuyFromMainSource();
-                SellToMainSource();
-
-                BuyerSummarize();
-                SellerSummarize();
-
 
                 Broadcast("SellMainSource");
                 Broadcast("BuyMainSource");
                 Broadcast("BuyersSummarize");
                 Broadcast("SellersSummarize");
 
+                DisplayResumeAndTotalMessages();
 
             }
 
         }
 
 
-        //Dutch Auction Validation Function.
-        public void ValidateDutchDeal()
+
+        // Double Auction Validation Functionality
+        public void ValidateDoubleAuctionDeal()
         {
-
-     
-
-
-            if (deals.Count != 0)
+            if (deals.Count >= 1)
             {
+                var successfulDeals = new List<Deal>();
 
+                
+                var reservePrice = 11m; // Use decimal literal by appending 'm' to the value
 
-               
+                var sortedBids = deals.OrderByDescending(x => x.Value);
+                var sortedOffers = deals.OrderBy(x => x.Value);
 
-
-                // Starts with the highest offer
-                var highestOffer = deals.OrderByDescending(x => x.Value).FirstOrDefault();
-
-                // Predetermined reserve price (the lowest acceptable price)
-                var reservePrice = 11; // Replace this with your actual reserve price
-
-                var finalPrice = highestOffer.Value;
-                string buyerName = highestOffer.Key;
-
-                // The auctioneer lowers the price until a buyer accepts
-                while (true)
+                foreach (var bid in sortedBids)
                 {
-                    // If there's a buyer who accepts this price
-                    if (deals.Any(deal => deal.Value >= finalPrice))
+                    var buyerName = bid.Key;
+                    var buyerBid = bid.Value;
+                    var buyerAlreadyMatched = false;
+
+                    foreach (var offer in sortedOffers)
                     {
-                        var buyerDeal = deals.FirstOrDefault(deal => deal.Value >= finalPrice);
-                        buyerName = buyerDeal.Key;
-                        break;
+                        var sellerName = offer.Key;
+                        var sellerOffer = offer.Value;
+
+                        if (buyerBid >= sellerOffer && buyerBid >= reservePrice && sellerOffer >= reservePrice)
+                        {
+                            // Check if the buyer has enough energy to sell
+                            if (household_Sells <= 0)
+                                break; // Exit the inner loop if the buyer doesn't have energy to sell
+
+                            // Average price of the highest bid and lowest offer
+                            var finalPrice = (int)((buyerBid + sellerOffer) / 2m);
+
+                            if (buyerAlreadyMatched)
+                                break; // Exit the inner loop if the buyer has already been matched
+
+                            Send(buyerName, $"buyerGetsDeal {finalPrice}");
+                            Send(sellerName, $"sellerSellsDeal {finalPrice}");
+
+                            successfulDeals.Add(new Deal(buyerName, sellerName, finalPrice));
+                            buyerAlreadyMatched = true; // Mark the buyer as already matched
+
+                            // Decrease the available energy for the buyer
+                            household_Sells--;
+                        }
+
                     }
-
-
-                    // If it reaches the reserve price
-                    if (finalPrice <= reservePrice)
-                    {
-                        break;
-                    }
-
-                    // Lower the price
-                    finalPrice--;
-                    //  Console.WriteLine("Bid Latest Price: " + finalPrice);
                 }
 
-                Send(buyerName, $"buyerGetsDeal {finalPrice}");
-                HouseholdSetup.numberOfDeals++;
+                foreach (var deal in successfulDeals)
+                {
+                    // Update relevant variables and statistics
+                    numberOfenergySold++;
+                    household_Money += (int)deal.FinalPrice;
+                    HouseholdSetup.numberOfDeals++;
 
-                household_Sells--;
-                //Set that the buyer has now less to sell.
-                numberOfenergySold++;
-                seller_money_sold += finalPrice;
-                household_Money += finalPrice;
-                string dealCompleted = ($"      |----------------------------------------------------------------------|\n" +
-                                        $"       |     Deal Completed -> {buyerName} buys 1kWh for a total of £{finalPrice}.  |\n" +
-                                        $"      |----------------------------------------------------------------------|\n");
 
-                Console.WriteLine(dealCompleted);
-                //Saving the data into the txt document.
-                saveSummarize(dealCompleted);
-                //Calls the manager to get the next deal by the seller.
+                    string dealCompleted = ($"      |--------------------------------------------------------------------------------------------|\n" +
+                                            $"              ->  Deal {HouseholdSetup.dealsCompleted++} Completed:\n" +
+                                            $"              => {deal.BuyerName} buys 1kWh for a total of £{deal.FinalPrice}.  \n" +
+                                            $"      |--------------------------------------------------------------------------------------------|\n");
+
+                    Console.WriteLine(dealCompleted);
+                    saveSummarize(dealCompleted);
+
+
+                }
+
                 Send("manager", "NextDeal");
-                HouseholdSetup.numberOfDeals++;
-              
-
                 NextDeal();
             }
             else
             {
-
-
-                Console.WriteLine("\n |----- No remaining Deals -----| \n");
-
-
-                Console.WriteLine("\n       |--Market Finished--| \n");
-                //Broadcasting the case which has the data of the summarize and the movements between the peers and main source.
-                BuyFromMainSource();
-                SellToMainSource();
-
-                BuyerSummarize();
-                SellerSummarize();
-
-
                 Broadcast("SellMainSource");
                 Broadcast("BuyMainSource");
                 Broadcast("BuyersSummarize");
                 Broadcast("SellersSummarize");
 
-
+                DisplayResumeAndTotalMessages();
+                          
             }
         }
+
+
+        decimal highestWinRateValue;
+        decimal lowestWinRateValue;
+        decimal highestWinRateValueBuyer;
+        decimal lowestWinRateValueBuyer;
+        public void DisplayResumeAndTotalMessages()
+        {
+
+           
+
+            // Call the SellerSummarize method to get all the win rate values
+            List<decimal> allWinRateValues = SellerSummarize();
+
+            //Max Win Rate Seller.
+            if (allWinRateValues.Count > 0)
+            {
+                highestWinRateValue = allWinRateValues.Max();
+               // Console.WriteLine($"The highest win rate value is: {highestWinRateValue}");
+
+            }
+            else
+            {
+                Console.WriteLine("No win rate values found.");
+            }
+
+
+            //Min Win Rate Seller.
+            if (allWinRateValues.Count > 0)
+            {
+                // Filter out the values equal to 0
+                var nonZeroWinRateValues = allWinRateValues.Where(value => value != 0);
+
+                if (nonZeroWinRateValues.Any())
+                {
+                    lowestWinRateValue = nonZeroWinRateValues.Min();
+                    //Console.WriteLine($"The lowest non-zero win rate value is: {lowestWinRateValue}");
+                }
+                else
+                {
+                    Console.WriteLine("All win rate values are zero.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No win rate values found.");
+            }
+
+
+
+
+
+            // Call the BuyerSummarize method to get all the win rate values
+            List<decimal> buyersSavesRateValues = BuyerSummarize();
+
+            if (buyersSavesRateValues.Count > 0)
+            {
+                highestWinRateValueBuyer = buyersSavesRateValues.Max();
+              //  Console.WriteLine($"|-- Buyers - The highest win rate value is: {highestWinRateValueBuyer}. --|");
+            }
+            else
+            {
+                Console.WriteLine("No win rate values found.");
+            }
+
+
+            if (buyersSavesRateValues.Count > 0)
+            {
+                // Filter out the values equal to 0
+                var nonZeroWinRateValues = buyersSavesRateValues.Where(value => value != 0);
+
+                if (nonZeroWinRateValues.Any())
+                {
+                    lowestWinRateValueBuyer = nonZeroWinRateValues.Min();
+                   // Console.WriteLine($"|-- Buyers - The lowest non-zero win rate value is: {lowestWinRateValueBuyer}. --|");
+                }
+                else
+                {
+                    Console.WriteLine("All win rate values are zero.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No win rate values found.");
+            }
+
+       
+
+
+          //  Console.Clear(); // Clear the console before displaying the resume and total messages
+
+                    Console.WriteLine("|----------------------------------|");
+                    Console.WriteLine("|--         Auction Ended.       --|");
+                    Console.WriteLine("|-------       Resume:      -------| ");
+                    Console.WriteLine("|----------------------------------| ");
+
+                    int Total = (HouseholdSetup.compradores - 1) + (HouseholdSetup.vendedores - 1) + (HouseholdSetup.dealsCompleted - 1);
+                    var BuyerNumberOfDeals = $"  |--  Buyer Number of Deals: {HouseholdSetup.compradores - 1}.  ";
+                    var SellerNumberOfDeals = $"  |--  Seller Number of Deals: {HouseholdSetup.vendedores - 1}.  ";
+                    var TotalDealsCompleted = $"  |--  Total Deals Completed: {HouseholdSetup.dealsCompleted - 1}. "; 
+                    var TotalMessages = "|----------------------------------|" +
+                                        "\n  |--  Total: " + Total + " messages.    \n" +
+                                        "|----------------------------------|\n";
+
+                    var savingSummary = "|--------------------------------------|\n"
+                                      + "|--         Savings Summary.         --| \n"
+                                      + "|--------------------------------------|";
+                      var LowerHigher = "|-----------               ------------|\n" +
+                                        "|--------------------------------------|\n"
+                                      + "|---            Buyers.             ---| \n"
+                                      + "|--------------------------------------|\n" +
+                                     "   |--  Highest Buyer Savings: £" + highestWinRateValueBuyer +   ".   \n" +
+                                     "   |--  Lowest Buyer Savings: £" + lowestWinRateValueBuyer +  ".   \n" +
+                                        "|--------------------------------------|\n"
+                                      + "|---            Sellers.            ---| \n"
+                                      + "|--------------------------------------|\n" +
+                                     "   |--  Highest Seller Savings: £" + highestWinRateValue + ".    \n" +
+                                     "   |--  Lowest Seller Savings: £"  + lowestWinRateValue + ".   \n" +
+                                        "|--------------------------------------|\n";
+
+
+             
+                
+
+
+
+                    Console.WriteLine(BuyerNumberOfDeals);
+                    Console.WriteLine(SellerNumberOfDeals);
+                    Console.WriteLine(TotalDealsCompleted);
+                    Console.WriteLine(TotalMessages);
+                    Console.WriteLine(savingSummary);
+                    Console.WriteLine(LowerHigher);
+
+
+                    saveSummarize(BuyerNumberOfDeals);
+                    saveSummarize(SellerNumberOfDeals);
+                    saveSummarize(TotalDealsCompleted);
+                    saveSummarize(TotalMessages);
+
+                    saveSummarize(savingSummary);
+                    saveSummarize(LowerHigher);
+
+
+
+
+        }
+
+
+
+
+
+
+
 
 
 
@@ -514,59 +659,98 @@ namespace EnergySystem23
             HouseholdSetup.numberOfDeals++;
         }
 
-      
-       
+        private int minPrice;
+        private int maxPrice;
+        private int currentPrice;
 
-        //Function to set buyer deal when called.
+
+
+        // private DateTime startTime = DateTime.Now; // Store the start time
+
+
+      
+
+
         public void buyer_setDeal()
         {
-            // int tempEnergy = household_Sells--;
+
             if (listOfBuyers.Count == 0)
             {
-                //sends a message to manager and gets a list of buyers 
+                // Sends a message to the manager and gets a list of buyers
                 Send("manager", "getListOfBuyers");
                 HouseholdSetup.numberOfDeals++;
             }
             else
             {
+                double initialPrice = 21.0; // Replace this with your desired initial price
+                string currentTime = DateTime.Now.ToString("HH:mm:ss");
+
+                double minPrice = 11.0;
+
+               
 
 
-                //Prints details of the seller.
+
+
                 string buyerDealtxt = ($"\n" + "          |-------------------------|\n" +
-                                      $"         --- Household Publish Deal {HouseholdSetup.vendedores++} ---  \n " +
-                                      $"         |-> {this.Name}           |\n" +
+                                      $"        --- Household Publish Deal {HouseholdSetup.vendedores++} ---  \n" +
+                                      $"          |-> {this.Name}         |\n" +
                                       $"          |-> Energy to sell: {household_Sells}     |\n" +
+                                      $"          |-> Max Price: {minPrice}         |\n" +
+                                      $"          |-> Min Price: {initialPrice}         |\n" +
+                                      $"          |-> Time: {currentTime}        |\n" +
                                       $"          |-> Looking for buyer...  |\n" +
                                       $"          |-------------------------|\n");
 
-
-
-                //Printing it to console.
+                // Printing it to console
                 Console.WriteLine(buyerDealtxt);
 
-                //saving data to txt document
+                // Saving data to txt document
                 saveSummarize(buyerDealtxt);
 
-
-                //Prints all the buyers that are saved on the list within the buyer deal called in the action case of the Manager Agent.
+                // Print all the buyers that are saved on the list within the buyer deal called in the action case of the Manager Agent
                 foreach (string buyer in listOfBuyers)
                 {
-                    //Sending to the manager the deal of the household and suming up the count of number of deals.
+                    // Sending to the manager the deal of the household and summing up the count of number of deals
                     Send(buyer, "buyersDeal");
-                    //Each buyer on the list has a deal to offer so counts up.
+                    // Each buyer on the list has a deal to offer, so increment the number of deals
                     HouseholdSetup.numberOfDeals++;
 
-
-
+                    // Record the time of the buyer's bid
+                    buyerBids[buyer] = DateTime.Now;
                 }
             }
- 
-            
-
         }
 
-        
-        
+
+
+
+
+
+        private int CalculateCurrentPrice(int initialPrice)
+        {
+            // Implement your logic here to update the price based on time or any other criteria
+            // For example, you can decrease the price over time or based on market conditions
+
+            // Update the minPrice and maxPrice variables based on the initial price
+            minPrice = Math.Min(minPrice, initialPrice);
+            maxPrice = Math.Max(maxPrice, initialPrice);
+
+            // Placeholder logic: Reduce the price by 1 for every 10 deals completed
+            int numberOfDealsCompleted = HouseholdSetup.dealsCompleted;
+            int priceReductionFactor = numberOfDealsCompleted / 10; // Adjust the factor based on your desired rate of price reduction
+
+            int currentPrice = initialPrice - priceReductionFactor;
+
+            // Make sure the current price does not go below a certain threshold
+            int minimumPrice = 10; // Set your desired minimum price
+            currentPrice = Math.Max(currentPrice, minimumPrice);
+
+            return currentPrice;
+        }
+
+
+
         //Used to get next deal by the seller, setting the count to 0.
         public void NextDeal()
         {
@@ -575,6 +759,10 @@ namespace EnergySystem23
         }
 
         ManagerAgent manager = new ManagerAgent();
+
+    
+
+
         //Sends to manager the data of which household bought an amount oof kWh from main source.
         public void BuyFromMainSource()
         {
@@ -596,7 +784,7 @@ namespace EnergySystem23
                 //Sell all energy left and set to 0 the amount of energy.
                 household_Buys = 0;
                 Send("manager", "maketFinal");
-            
+
             }
 
         }
@@ -680,95 +868,190 @@ namespace EnergySystem23
                 Send("manager", "maketFinal");
             }
 
-          
+
 
         }
+
 
 
         //Summarize if the market for the buyer.
-        public void BuyerSummarize()
+        public List<decimal> BuyerSummarize()
         {
             if (household == "Buyer")
             {
-
                 string nameofHouseholdBuyer = $"{this.Name}";
                 int amountBought = boughtFromSeller + priceBoughMainSource;
 
-                // string savedBuyer = $"{Math.Abs(household_Money - amountBought * mainSourceBuyDeal)} ";
+                decimal totalCostFromMainSource = amountBought * mainSourceBuyDeal;
+                decimal totalCostFromHouseholds = Math.Abs(household_Money);
+                decimal savings = totalCostFromMainSource - totalCostFromHouseholds;
+                decimal averageCostToBuyers = amountBought != 0 ? totalCostFromMainSource / amountBought : 0.0m;
 
-                //   string winRate = $" {System.Math.Abs(household_Money) - amountBought - household_Money)}";
-                string buyerSumtxt = ("\n|----------------------------------------------|\n"
-                                   + $"  |        {nameofHouseholdBuyer} -> Credits: {household_Money}£              \n"
-                                   + $"  |Bought: {amountBought} kWh for a total cost of £{(Math.Abs(household_Money))}\n"
-                                   + $"  |Price to buy from Main Source: £{amountBought * mainSourceBuyDeal} \n"
-                                   + $"  |Saved:  {Math.Abs(household_Money) - amountBought * mainSourceBuyDeal}£\n"
-                                   + "|----------------------------------------------|\n");
-                //Print to console
+                // Add winRateValue to the list
+                HouseholdSetup.buyersSavesRateValues.Add(savings);
+
+                // Round the average cost to two decimal places
+                averageCostToBuyers = Math.Round(averageCostToBuyers, 2);
+
+                string buyerSumtxt = $"\n|----------------------------------------------|\n" +
+                                     $"  |        {nameofHouseholdBuyer} -> Credits: {household_Money}£              \n" +
+                                     $"  |Bought: {amountBought} kWh for a total cost of £{totalCostFromHouseholds}\n" +
+                                     $"  |Price to buy from Main Source: £{totalCostFromMainSource} \n" +
+                                     $"  |Saved:  {savings}£\n" +
+                                     $"  |Average Cost to Buyers: {averageCostToBuyers}£ per unit\n" +
+                                     $"|----------------------------------------------|\n";
+
                 Console.WriteLine(buyerSumtxt);
-                //Save to txt document.              
                 saveSummarize(buyerSumtxt);
-
-                
-
             }
-          
+            return HouseholdSetup.buyersSavesRateValues;
         }
 
-        //Summarize the market records of the seller
-        public void SellerSummarize()
+
+
+       
+
+        public List<decimal> SellerSummarize()
         {
             if (household == "Seller")
             {
-
                 int totalSold = numberOfenergySold + priceSoldto_mainSource;
+
+                decimal averageProfit = totalSold != 0 ? household_Money / (decimal)totalSold : 0.0m;
 
                 string nameofHousehold = $"{this.Name}";
                 string wallet = $"{household_Money}";
 
-                //   nameofHousehold.FirstOrDefault();
+                decimal winRateValue = Math.Abs(totalSold * mainSourceSellDeal - household_Money);
 
-                string winRate = $" {System.Math.Abs(totalSold * mainSourceSellDeal - household_Money)}";
+                // Add winRateValue to the list
+                HouseholdSetup.winRateValues.Add(winRateValue);
 
+                string sellerSummarize = $"\n|---------------------------------------------------------------|\n" +
+                                         $"  |       {nameofHousehold} ->  Credits: {wallet}£               \n" +
+                                         $"  |Total kWh Sold: {totalSold}, with an income of: £{household_Money}\n" +
+                                         $"  |By dealing with the Main Source would have created an income of £{totalSold * mainSourceSellDeal}\n" +
+                                         $"  |Average Profit: {averageProfit}£ per unit sold\n" +
+                                         $"  |Win Rate: £{winRateValue}\n" +
+                                         $"|---------------------------------------------------------------|\n";
 
-                string SellerSummarize = ("\n|---------------------------------------------------------------|\n" +
-                                        $"  |       {nameofHousehold} ->  Credits: {wallet}£               \n" +
-                                        $"  |Total kWh Sold: {totalSold}, with an income of: £{household_Money}\n" +
-                                        $"  |By dealing with the Main Source would have created an income of £{totalSold * mainSourceSellDeal}\n" +
-                                        $"  |Win Rate: £{winRate}\n" +
-                                           "|---------------------------------------------------------------|\n");
-                //Print it to console
-                Console.WriteLine(SellerSummarize);
-                //Saved into the txt document.
-                saveSummarize(SellerSummarize);
-
-              
-
-
+                // Print it to the console
+                Console.WriteLine(sellerSummarize);
+                // Save it into the text document.
+                saveSummarize(sellerSummarize);
             }
+
+
+
+            return HouseholdSetup.winRateValues;
+
 
         }
 
+        public void CalculateHighestWinRateValue()
+        {
+            // Call the SellerSummarize method to get all the win rate values
+            List<decimal> allWinRateValues = SellerSummarize();
+
+            if (allWinRateValues.Count > 0)
+            {
+                decimal highestWinRateValue = allWinRateValues.Max();
+                Console.WriteLine($"|-- Sellers - The highest win rate value is: {highestWinRateValue} . --|");
+            }
+            else
+            {
+                Console.WriteLine("No win rate values found.");
+            }
+
+
+            if (allWinRateValues.Count > 0)
+            {
+                // Filter out the values equal to 0
+                var nonZeroWinRateValues = allWinRateValues.Where(value => value != 0);
+
+                if (nonZeroWinRateValues.Any())
+                {
+                    decimal lowestWinRateValue = nonZeroWinRateValues.Min();
+                    Console.WriteLine($"|-- Sellers - The lowest non-zero win rate value is: {lowestWinRateValue} . --|");
+                }
+                else
+                {
+                    Console.WriteLine("All win rate values are zero.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No win rate values found.");
+            }
+
+
+        }
+
+
+        public void CalculateHighestWinRateValueBuyers()
+        {
+            // Call the SellerSummarize method to get all the win rate values
+            List<decimal> buyersSavesRateValues = BuyerSummarize();
+
+            if (buyersSavesRateValues.Count > 0)
+            {
+                decimal highestWinRateValue = buyersSavesRateValues.Max();
+                Console.WriteLine($"|-- Buyers - The highest win rate value is: {highestWinRateValue}. --|");
+            }
+            else
+            {
+                Console.WriteLine("No win rate values found.");
+            }
+
+
+            if (buyersSavesRateValues.Count > 0)
+            {
+                // Filter out the values equal to 0
+                var nonZeroWinRateValues = buyersSavesRateValues.Where(value => value != 0);
+
+                if (nonZeroWinRateValues.Any())
+                {
+                    decimal lowestWinRateValue = nonZeroWinRateValues.Min();
+                    Console.WriteLine($"|-- Buyers - The lowest non-zero win rate value is: {lowestWinRateValue}. --|");
+                }
+                else
+                {
+                    Console.WriteLine("All win rate values are zero.");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No win rate values found.");
+            }
+
+
+        }
+
+
+
+
+
         private void saveSummarize(string summarize)
         {
-           
+
             try
             {
-               // File.Create("marketSummarize.txt");
+                // File.Create("marketSummarize.txt");
                 string path = Directory.GetCurrentDirectory();
-                string filePath = $"{path}/marketSummarize.txt"; 
+                string filePath = $"{path}/marketSummarize.txt";
 
-                    string[] summarize2 = { summarize };
+                string[] summarize2 = { summarize };
 
                 File.AppendAllLines(filePath, summarize2);
 
-              
+
             }
             catch (Exception ex)
             {
                 Console.WriteLine("An error occurred while trying to save the file: " + ex.Message);
             }
 
-         
+
 
         }
 
@@ -776,34 +1059,40 @@ namespace EnergySystem23
         //Making a menu for reload the system, quit or print the summarize of the market.
         private void menu()
         {
-            int Total = (HouseholdSetup.compradores - 1) + (HouseholdSetup.vendedores - 1);
-            Console.WriteLine($"Buyer Number of Deals: {HouseholdSetup.compradores-1}");
-            Console.WriteLine($"Seller Number of Deals: {HouseholdSetup.vendedores - 1}");
-            Console.WriteLine("Total: " + Total);
 
-            Console.WriteLine("1. Re-run System.");
-            Console.WriteLine("2. Quit.");
+            int option = 0;
 
-            // Read the user's input
-            Console.Write("Please select an option: \n");
-            int option = int.Parse(Console.ReadLine());
+            while (option != 1 && option != 2 && option != 3)
+            {
+                Console.WriteLine("1. Re-run System.");
+                Console.WriteLine("2. Display Number of Messages & Savings Summary.");
+                Console.WriteLine("3. Quit.");
+
+                // Read the user's input
+                Console.Write("Please select an option: ");
+                if (!int.TryParse(Console.ReadLine(), out option))
+                {
+                    Console.WriteLine("Invalid input. Please enter a valid option (1, 2, or 3).");
+                }
+            }
+
+            // At this point, 'option' will contain a valid input value (1, 2, or 3)
+            Console.WriteLine("Selected option: " + option);
+
             Program program = new Program();
+
             // Handle the user's input using a switch statement
             switch (option)
             {
 
-            
-                //Reruns the system.
-                case 1: // If the user chose option 2, reload the program
-                        // Define the class where the Main() method is located
-
+                case 1:
                     HouseholdSetup.compradores = 0;
                     HouseholdSetup.vendedores = 0;
+                    HouseholdSetup.dealsCompleted = 0;
+                    HouseholdSetup.numberOfHouseholds = 0;
                     Type mainClass = typeof(Program);
 
-
-                    // Define the parameters for the Main() method (if any)
-                    object[] mainArgs = { /* Insert any arguments for the Main() method here */ };
+                    object[] mainArgs = { };
 
                     // Call the Main() method using the InvokeMember() method
                     mainClass.InvokeMember("Main", BindingFlags.InvokeMethod | BindingFlags.Static | BindingFlags.Public, null, null, mainArgs);
@@ -811,48 +1100,24 @@ namespace EnergySystem23
 
 
                 case 2:
-                    //Stops the app calling the function created for it.
-
-                    program.stopApp();
+                    DisplayResumeAndTotalMessages();
                     break;
 
-                //case 4:
-                //    Console.WriteLine("1. Re-run System.");
-                //    Console.WriteLine("2. Quit.");
-                //    // Read the user's input
-                //    Console.Write("Please select an option: \n");
-                //    int option2 = int.Parse(Console.ReadLine());
+              
 
-                //    switch (option2)
-                //    {
-                //        case 1:
-                //            // Define the class where the Main() method is located
-                //            Type mainClass1 = typeof(Program);
+     
 
-                //            // Define the parameters for the Main() method (if any)
-                //            object[] mainArgs1 = { /* Insert any arguments for the Main() method here */ };
+                case 3:
+                    program.stopApp();
+                  
+                    break;
 
-                //            // Call the Main() method using the InvokeMember() method
-                //            mainClass1.InvokeMember("Main", BindingFlags.InvokeMethod | BindingFlags.Static | BindingFlags.Public, null, null, mainArgs1);
-
-                //            break;
-
-                //        case 2:
-                //            program.stopApp();
-                //            break;
-
-                //        default:
-                //            break;
-                //    }
-                //    break;
-
-
-                default: // If the user entered an invalid option, display an error message
+                default:
                     Console.WriteLine("Invalid option. Please try again.");
                     break;
             }
-
         }
+
 
     }
 }

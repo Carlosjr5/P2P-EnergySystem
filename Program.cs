@@ -19,6 +19,17 @@ namespace EnergySystem23
             public static bool protocol;
             public static int compradores = 0;
             public static int vendedores = 0;
+            public static int dealsCompleted = 0;
+            public static bool sprotocol;
+            internal static decimal household_Money;
+            internal static DateTime startTime;
+
+            // Define a list to store the win rate values
+          public static List<decimal> winRateValues = new List<decimal>();
+            public static List<decimal> buyersSavesRateValues = new List<decimal>();
+
+
+            public static int numberOfHouseholds;
 
         }
       
@@ -35,7 +46,7 @@ namespace EnergySystem23
             EnvironmentAgent envAgent = new EnvironmentAgent(); environment.Add(envAgent, "environment");
 
 
-            Console.WriteLine("\n|---------------------------------------------|");
+            Console.WriteLine("\n|-----------------------------------------------|");
             Console.WriteLine("|---   Welcome to Carlos P2P Energy System   ---|");
             Console.WriteLine("|---        40452913 -- SET10111             ---|");
             Console.WriteLine("|-----------------------------------------------|\n");
@@ -62,61 +73,80 @@ namespace EnergySystem23
             */
 
             // Prompt the user to enter a number
-            Console.WriteLine("\n|-------------------------------------------|");
-            Console.WriteLine("|--- Please enter a number of household: ---|");
-            Console.WriteLine("|-------------------------------------------|\n");
+            Console.WriteLine("\n  |--------------------------------------------|");
+            Console.WriteLine("  |--- Please enter a number of households: ---|");
+            Console.WriteLine("  |--------------------------------------------|\n");
 
-            // Get the input as a string
-            
-            string input = Console.ReadLine();
+          
 
-            // Convert the string to an integer
-            int numberOfHouseholds = int.Parse(input);
+            bool isValidInputa = false;
 
-            // Print the number to the console
-            Console.WriteLine($"You entered a number of: {numberOfHouseholds} Households.");
+            while (!isValidInputa)
+            {
+                // Get the input as a string
+                string input = Console.ReadLine();
 
-            
+                // Convert the string to an integer
+                if (int.TryParse(input, out HouseholdSetup.numberOfHouseholds))
+                {
+                    Console.WriteLine($"You entered a number of {HouseholdSetup.numberOfHouseholds} households.");
+                    isValidInputa = true;
+                }
+                else
+                {
+                    // Invalid input: input is not a valid number
+                    Console.WriteLine("Invalid input. Please enter a valid number of households.");
+                }
+            }
+
 
             // Prompt the user to enter a number
-            Console.WriteLine("\n|--------------------------------------------------------|");
+            Console.WriteLine("\n|----------------------------------------------------------|");
             Console.WriteLine("|--- Which Protocol would you like to use? (1 or 2):    ---|");
-            Console.WriteLine("|---         1. Second Bid Auction:                     ---|");
-            Console.WriteLine("|---         2. Dutch Auction:                          ---|");
+            Console.WriteLine("|---         1. Double Auction.                         ---|");
+            Console.WriteLine("|---         2. Second-Bid Auction.                     ---|");
             Console.WriteLine("|----------------------------------------------------------|\n");
 
-            // Get the input as a string
-            string inputProtocol = Console.ReadLine();
+            int numberProtocol;
+            bool isValidInput = false;
 
-            // Convert the string to an integer
-            int numberProtocol = int.Parse(inputProtocol);
-          
-            if (numberProtocol == 1) 
+            while (!isValidInput)
             {
-                HouseholdSetup.protocol = true;
-              
-                Console.WriteLine($"You entered: {numberProtocol}, which is the Second Bid Auction.");
-               // Console.WriteLine("Protocol: " + HouseholdSetup.protocol);
+                // Get the input as a string
+                string inputProtocol = Console.ReadLine();
 
-
+                // Convert the string to an integer
+                if (int.TryParse(inputProtocol, out numberProtocol))
+                {
+                    // Check if the number is either 1 or 2
+                    if (numberProtocol == 1)
+                    {
+                        HouseholdSetup.protocol = true;
+                        Console.WriteLine($"You entered: {numberProtocol}, which is the Double Auction.");
+                        isValidInput = true;
+                    }
+                    else if (numberProtocol == 2)
+                    {
+                        HouseholdSetup.protocol = false;
+                        Console.WriteLine($"You entered: {numberProtocol}, which is the Second-Bid Auction.");
+                        isValidInput = true;
+                    }
+                    else
+                    {
+                        // Invalid input: number is neither 1 nor 2
+                        Console.WriteLine("Invalid input. Please enter a valid number (1 or 2).");
+                    }
+                }
+                else
+                {
+                    // Invalid input: input is not a valid number
+                    Console.WriteLine("Invalid input. Please enter a valid number (1 or 2).");
+                }
             }
-             
-            if(numberProtocol == 2 )
-            {
-                HouseholdSetup.protocol = false;
-                Console.WriteLine($"You entered: {numberProtocol}, which is the Dutch Auction.");
-              //  Console.WriteLine("Protocol : " + HouseholdSetup.protocol);
-            }
 
-
-            if(numberProtocol != 1 && numberProtocol != 2) 
-            {
-                Console.WriteLine("You can only choose between '1' or '2', try again.") ;
-                return ;
-            }
 
             //Was failing sometimes so was testing maybe to ask for more number of household than 3.
-            if (numberOfHouseholds <= 1)
+            if (HouseholdSetup.numberOfHouseholds <= 1)
             {
                 Console.WriteLine("The system needs more than 1 Household in order to work, try with higher number than 1.");
 
@@ -127,12 +157,12 @@ namespace EnergySystem23
                 string input2 = Console.ReadLine();
 
                 // Convert the string to an integer
-                numberOfHouseholds = int.Parse(input2);
+                HouseholdSetup.numberOfHouseholds = int.Parse(input2);
             }
 
 
             //Gets the number of households and adds it into the environment.
-            for (int totalHouseholds = 0; totalHouseholds < numberOfHouseholds; totalHouseholds++)
+            for (int totalHouseholds = 0; totalHouseholds < HouseholdSetup.numberOfHouseholds; totalHouseholds++)
             {
                 var totalhousehold = new Households();
                 environment.Add(totalhousehold, $"Household[{totalHouseholds + 1}]");
@@ -144,12 +174,12 @@ namespace EnergySystem23
             environment.Add(manager, "manager");
 
             //Counting up the number of households and announcing it.
-            HouseholdSetup.numberOfAnnouncements = numberOfHouseholds + 1;
+            HouseholdSetup.numberOfAnnouncements = HouseholdSetup.numberOfHouseholds + 1;
 
       
 
 
-            HouseholdSetup.totalNumberOfHouseholds = numberOfHouseholds;
+            HouseholdSetup.totalNumberOfHouseholds = HouseholdSetup.numberOfHouseholds;
 
             environment.Start();
             Console.ReadLine();

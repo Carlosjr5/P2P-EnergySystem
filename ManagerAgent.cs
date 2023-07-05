@@ -116,7 +116,9 @@ namespace EnergySystem23
                         {
                         Broadcast("fin");
 
-                        }
+              
+
+                    }
 
                     break;
 
@@ -203,12 +205,26 @@ namespace EnergySystem23
                 //Once there is no more sellers in the list the maket closes and Broadcast the data with the summarize of the household.
 
 
-                Console.WriteLine("\n  |------ No remaining sellers ------| \n");
-                saveSummarize("\n |------ No remaining sellers ------| \n");
+            
 
-
-                Console.WriteLine("\n        |--Market Finished--| \n");
                 saveSummarize("\n            |--Market Finished--| \n");
+
+                Console.WriteLine("             |---------------------|");
+                Console.WriteLine("             |--  Market Resume  --|");
+                Console.WriteLine("             |---------------------| \n");
+
+
+                int Total = (HouseholdSetup.compradores - 1) + (HouseholdSetup.vendedores - 1) + (HouseholdSetup.dealsCompleted - 1);
+                Console.WriteLine($"|- Buyer Number of Deals: {HouseholdSetup.compradores - 1} --|");
+                Console.WriteLine($"|- Seller Number of Deals: {HouseholdSetup.vendedores - 1} --|");
+                Console.WriteLine($"|- Total Deals Completed: {HouseholdSetup.dealsCompleted - 1} --|\n");
+                Console.WriteLine("                |-- Total: " + Total + " messages. --|");
+
+                saveSummarize($"|- Buyer Number of Deals: {HouseholdSetup.compradores - 1} --|");
+                saveSummarize($"|- Seller Number of Deals: {HouseholdSetup.vendedores - 1} --|");
+                saveSummarize($"|- Total Deals Completed: {HouseholdSetup.dealsCompleted - 1} --|\n");
+                saveSummarize("         |-- Total: " + Total + " messages. --|");
+
 
 
                 //Broadcasting the case which has the data of the summarize and the movements between the peers and main source.
