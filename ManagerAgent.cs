@@ -114,6 +114,8 @@ namespace EnergySystem23
                         }
                         else 
                         {
+
+                            
                         Broadcast("fin");
 
               
@@ -173,14 +175,34 @@ namespace EnergySystem23
 
         }
 
-  
 
+      
         //Evaluates the deal of the seller so its added into the environment.
         private void EvaluateDeals()
         {
             //while there are deals, decision of higher value to pay is made.
             if (deals.Count != 0)
             {
+
+                //One more deal done.
+                HouseholdSetup.numberOfDeals++;
+                string bidTimeFormat = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+
+                HouseholdSetup.dealTimes.Add(bidTimeFormat);
+
+                TimeSpan closestTimeSpan = TimeSpan.MaxValue;
+                string closestTime = "";
+
+                foreach (string time in HouseholdSetup.dealTimes)
+                {
+                    TimeSpan timeSpan = DateTime.Parse(time).TimeOfDay;
+
+                    if (timeSpan < closestTimeSpan && timeSpan > TimeSpan.Zero)
+                    {
+                        closestTimeSpan = timeSpan;
+                        closestTime = time;
+                    }
+                }
 
                 //Variable to store the higher value on the deals from the top to bottom, returning the first element on the sequence.
                 var highest = deals.OrderByDescending(x => x.Value).FirstOrDefault();
@@ -194,9 +216,6 @@ namespace EnergySystem23
                         //Gives the deal ton the manager
                         Send(seller, "SellerdealCompleted");
 
-                        //One more deal done.
-                        HouseholdSetup.numberOfDeals++;
-
                     }
                 }
             }
@@ -207,33 +226,17 @@ namespace EnergySystem23
 
             
 
-                saveSummarize("\n            |--Market Finished--| \n");
+                saveSummarize("\n            |-- Market Finished --| \n");
 
-                Console.WriteLine("             |---------------------|");
-                Console.WriteLine("             |--  Market Resume  --|");
-                Console.WriteLine("             |---------------------| \n");
-
-
-                int Total = (HouseholdSetup.compradores - 1) + (HouseholdSetup.vendedores - 1) + (HouseholdSetup.dealsCompleted - 1);
-                Console.WriteLine($"|- Buyer Number of Deals: {HouseholdSetup.compradores - 1} --|");
-                Console.WriteLine($"|- Seller Number of Deals: {HouseholdSetup.vendedores - 1} --|");
-                Console.WriteLine($"|- Total Deals Completed: {HouseholdSetup.dealsCompleted - 1} --|\n");
-                Console.WriteLine("                |-- Total: " + Total + " messages. --|");
-
-                saveSummarize($"|- Buyer Number of Deals: {HouseholdSetup.compradores - 1} --|");
-                saveSummarize($"|- Seller Number of Deals: {HouseholdSetup.vendedores - 1} --|");
-                saveSummarize($"|- Total Deals Completed: {HouseholdSetup.dealsCompleted - 1} --|\n");
-                saveSummarize("         |-- Total: " + Total + " messages. --|");
-
+                
 
 
                 //Broadcasting the case which has the data of the summarize and the movements between the peers and main source.
                 Broadcast("SellMainSource");
                 Broadcast("BuyMainSource");
-
                 Broadcast("BuyersSummarize");
                 Broadcast("SellersSummarize");
-
+                
 
             }
 

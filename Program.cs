@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Diagnostics;
 using ActressMas;
+using System.Reflection.Metadata;
 
 namespace EnergySystem23
 {
@@ -19,20 +20,36 @@ namespace EnergySystem23
             public static bool protocol;
             public static int compradores = 0;
             public static int vendedores = 0;
+            public static int buyToMain = 0;
+            public static int sellToMain = 0;
             public static int dealsCompleted = 0;
             public static bool sprotocol;
             internal static decimal household_Money;
             internal static DateTime startTime;
 
-            // Define a list to store the win rate values
-          public static List<decimal> winRateValues = new List<decimal>();
-            public static List<decimal> buyersSavesRateValues = new List<decimal>();
 
+            public static string closestTime = "";
+            public static string latestTime = "";
+            public static List<string> dealTimes = new List<string>();
+
+            // Define a list to store the win rate values
+            public static List<decimal> winRateValues = new List<decimal>();
+            public static List<decimal> buyersSavesRateValues = new List<decimal>();
+            public static List<decimal> allAverageCostToBuyers = new List<decimal>();
+            public static List<decimal> allAverageCostToSellers = new List<decimal>();
+
+            public static List<decimal> buyMainSource = new List<decimal>();
+            public static List<decimal> buyMainSourcePrice = new List<decimal>();
+            public static List<decimal> sellMainSource = new List<decimal>();
 
             public static int numberOfHouseholds;
 
+            public static decimal averageCostToBuyers { get; internal set; }
         }
       
+
+
+
 
         //Main function of the system.
        public  static void Main()
@@ -77,8 +94,7 @@ namespace EnergySystem23
             Console.WriteLine("  |--- Please enter a number of households: ---|");
             Console.WriteLine("  |--------------------------------------------|\n");
 
-          
-
+            int numberOfHouseholds = 0;
             bool isValidInputa = false;
 
             while (!isValidInputa)
@@ -87,9 +103,9 @@ namespace EnergySystem23
                 string input = Console.ReadLine();
 
                 // Convert the string to an integer
-                if (int.TryParse(input, out HouseholdSetup.numberOfHouseholds))
+                if (int.TryParse(input, out numberOfHouseholds))
                 {
-                    Console.WriteLine($"You entered a number of {HouseholdSetup.numberOfHouseholds} households.");
+                    Console.WriteLine($"You entered a number of {numberOfHouseholds} households.");
                     isValidInputa = true;
                 }
                 else
@@ -99,12 +115,12 @@ namespace EnergySystem23
                 }
             }
 
-
             // Prompt the user to enter a number
             Console.WriteLine("\n|----------------------------------------------------------|");
-            Console.WriteLine("|--- Which Protocol would you like to use? (1 or 2):    ---|");
+            Console.WriteLine("|--- Which Protocol would you like to use? (1, 2, or 3): ---|");
             Console.WriteLine("|---         1. Double Auction.                         ---|");
             Console.WriteLine("|---         2. Second-Bid Auction.                     ---|");
+            Console.WriteLine("|---         3. Change number of households             ---|");
             Console.WriteLine("|----------------------------------------------------------|\n");
 
             int numberProtocol;
@@ -118,7 +134,7 @@ namespace EnergySystem23
                 // Convert the string to an integer
                 if (int.TryParse(inputProtocol, out numberProtocol))
                 {
-                    // Check if the number is either 1 or 2
+                    // Check if the number is either 1, 2, or 3
                     if (numberProtocol == 1)
                     {
                         HouseholdSetup.protocol = true;
@@ -131,24 +147,54 @@ namespace EnergySystem23
                         Console.WriteLine($"You entered: {numberProtocol}, which is the Second-Bid Auction.");
                         isValidInput = true;
                     }
+                    else if (numberProtocol == 3)
+                    {
+
+                        Main();
+                        // Prompt the user to enter a new number of households
+                     //   Console.WriteLine("\n|--------------------------------------------|");
+                      //  Console.WriteLine("|--- Please enter a new number of households: ---|");
+                       // Console.WriteLine("|--------------------------------------------|\n");
+
+                        bool isValidInputas = false;
+
+                        while (!isValidInputas)
+                        {
+                            // Get the input as a string
+                            string input = Console.ReadLine();
+
+                            // Convert the string to an integer
+                            if (int.TryParse(input, out numberOfHouseholds))
+                            {
+                                Console.WriteLine($"You entered a new number of {numberOfHouseholds} households.");
+                                isValidInputas = true;
+                                Main();
+
+                            }
+                            else
+                            {
+                                // Invalid input: input is not a valid number
+                                Console.WriteLine("Invalid input. Please enter a valid number of households.");
+                            }
+                        }
+                    }
                     else
                     {
-                        // Invalid input: number is neither 1 nor 2
-                        Console.WriteLine("Invalid input. Please enter a valid number (1 or 2).");
+                        // Invalid input: number is neither 1, 2, nor 3
+                        Console.WriteLine("Invalid input. Please enter a valid number (1, 2, or 3).");
                     }
                 }
                 else
                 {
                     // Invalid input: input is not a valid number
-                    Console.WriteLine("Invalid input. Please enter a valid number (1 or 2).");
+                    Console.WriteLine("Invalid input. Please enter a valid number (1, 2, or 3).");
                 }
             }
 
-
-            //Was failing sometimes so was testing maybe to ask for more number of household than 3.
-            if (HouseholdSetup.numberOfHouseholds <= 1)
+            // Was failing sometimes so was testing maybe to ask for more number of household than 3.
+            if (numberOfHouseholds <= 1)
             {
-                Console.WriteLine("The system needs more than 1 Household in order to work, try with higher number than 1.");
+                Console.WriteLine("The system needs more than 1 Household in order to work, try with a higher number than 1.");
 
                 // Prompt the user to enter a number
                 Console.WriteLine("Please enter a number of households:");
@@ -157,34 +203,27 @@ namespace EnergySystem23
                 string input2 = Console.ReadLine();
 
                 // Convert the string to an integer
-                HouseholdSetup.numberOfHouseholds = int.Parse(input2);
+                numberOfHouseholds = int.Parse(input2);
             }
 
-
-            //Gets the number of households and adds it into the environment.
-            for (int totalHouseholds = 0; totalHouseholds < HouseholdSetup.numberOfHouseholds; totalHouseholds++)
+            // Gets the number of households and adds it into the environment.
+            for (int totalHouseholds = 0; totalHouseholds < numberOfHouseholds; totalHouseholds++)
             {
                 var totalhousehold = new Households();
                 environment.Add(totalhousehold, $"Household[{totalHouseholds + 1}]");
             }
 
-
-            //Calling the Manager to save the data of the buyer and sellers.
+            // Calling the Manager to save the data of the buyer and sellers.
             ManagerAgent manager = new ManagerAgent();
             environment.Add(manager, "manager");
 
-            //Counting up the number of households and announcing it.
-            HouseholdSetup.numberOfAnnouncements = HouseholdSetup.numberOfHouseholds + 1;
-
-      
-
-
-            HouseholdSetup.totalNumberOfHouseholds = HouseholdSetup.numberOfHouseholds;
+            // Counting up the number of households and announcing it.
+            HouseholdSetup.numberOfAnnouncements = numberOfHouseholds + 1;
+            HouseholdSetup.totalNumberOfHouseholds = numberOfHouseholds;
 
             environment.Start();
             Console.ReadLine();
 
-        
 
         }
 
