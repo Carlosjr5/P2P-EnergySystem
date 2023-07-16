@@ -4,7 +4,7 @@
 Study of 2 different protocols "Double Auction & Second-Bid Auction", developed using C# and ActressMAS framework.
 
 - Documentation of Study:
-[P2PEnergySystemStudy.docx](https://github.com/Carlosjr5/P2P-EnergySystem/files/12064871/P2PEnergySystemStudy.docx)
+[P2P-Energy-System-Study-CJR.docx](https://github.com/Carlosjr5/P2P-EnergySystem/files/12064909/P2PEnergySystemStudy.docx)
 
 
  - 250 Households Analysis:
