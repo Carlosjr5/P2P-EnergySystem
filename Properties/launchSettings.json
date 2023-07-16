@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "EnergySystem23": {
+      "commandName": "Project",
+      "remoteDebugEnabled": true,
+      "nativeDebugging": true,
+      "jsWebView2Debugging": false
+    }
+  }
+}

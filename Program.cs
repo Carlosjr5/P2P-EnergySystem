@@ -107,6 +107,9 @@ namespace EnergySystem23
                 {
                     Console.WriteLine($"You entered a number of {numberOfHouseholds} households.");
                     isValidInputa = true;
+
+                    
+  
                 }
                 else
                 {

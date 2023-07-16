@@ -92,7 +92,6 @@ namespace EnergySystem23
             buyerBids = new Dictionary<string, DateTime>();
 
 
-
         }
 
         Program program = new Program();
@@ -113,6 +112,8 @@ namespace EnergySystem23
                     household_Generates = Int32.Parse(parameters[1]);
                     mainSourceBuyDeal = Int32.Parse(parameters[2]);
                     mainSourceSellDeal = Int32.Parse(parameters[3]);
+
+
 
                     //Checks if the households needs more than it generates.
                     if (household_Generates > household_Needs)
